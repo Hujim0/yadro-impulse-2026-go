@@ -53,7 +53,7 @@ func (gameInstance *GameInstance) RunGameLoop() {
 				gameInstance.OutputEventChan <- event.GameOutputEvent{
 					Error: fmt.Errorf("Player state is wrong: %s but should be \"IN_GAME\"", player.State),
 				}
-				ImpossibleMove(&newEvent, gameInstance)
+				gameInstance.ImpossibleMove(&newEvent)
 				continue
 			}
 
@@ -87,72 +87,15 @@ func (gameInstance *GameInstance) RunGameLoop() {
 	}
 }
 
-type DungeonEventHandler func(event *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error)
-
-var DungeonEventTypeToPlayerEventHandler = map[event.GameEventId]DungeonEventHandler{
-	event.PlayerRegistered: func(event *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error) {
-		if event.OccuredAtSecond > gameInstance.closesAtSeconds {
-			return nil, fmt.Errorf("the dungeon is closed! cant register.")
-		}
-
-		gameInstance.registeredPlayers[event.PlayerId] = REGISTERED
-		return nil, nil
-	},
-	event.PlayerEntered: func(newEvent *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error) {
-		_, ok := gameInstance.registeredPlayers[newEvent.PlayerId]
-
-		if !ok {
-			gameInstance.registeredPlayers[newEvent.PlayerId] = DISQUAL
-			disqualifiedEvent := event.GameEvent{
-				OccuredAtSecond: newEvent.OccuredAtSecond,
-				PlayerId:        newEvent.PlayerId,
-				EventId:         event.PlayerDisqualified,
-			}
-			return &disqualifiedEvent, fmt.Errorf("Only registered players are allowed to participate in the challenge")
-		}
-
-		newPlayerInstance := CreateNewPlayer(newEvent.OccuredAtSecond, newEvent.PlayerId, gameInstance.floors, gameInstance.monsters)
-		newPlayerInstance.Floors[0].LastTimeEnteredSeconds = newEvent.OccuredAtSecond
-
-		gameInstance.players[newEvent.PlayerId] = newPlayerInstance
-		gameInstance.registeredPlayers[newEvent.PlayerId] = IN_GAME
-
-		return nil, nil
-	},
-}
-
-func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours int) (*GameInstance, error) {
-	if Floors <= 0 {
-		return nil, fmt.Errorf("Floor count should be greater than 0")
+func (gameInstance *GameInstance) ImpossibleMove(newEvent *event.GameEvent) {
+	gameInstance.OutputEventChan <- event.GameOutputEvent{
+		Event: event.GameEvent{
+			OccuredAtSecond: newEvent.OccuredAtSecond,
+			PlayerId:        newEvent.PlayerId,
+			EventId:         event.PlayerMakesImposibleMove,
+			ExtraParam:      int(newEvent.EventId),
+		},
 	}
-	if Monsters < 0 {
-		return nil, fmt.Errorf("Monsters count should be greater or equal to 0")
-	}
-	if DurationHours <= 0 {
-		return nil, fmt.Errorf("DurationHours should be greater than 0")
-	}
-
-	seconds, minutes, hours := 0, 0, 0
-	n, err := fmt.Sscanf(OpenAt, "%d:%d:%d", &hours, &minutes, &seconds)
-
-	if err != nil || n != 3 {
-		return nil, fmt.Errorf("Failed to parse dungeon open time")
-	}
-
-	openAtSeconds := seconds + minutes*60 + hours*60*60
-
-	gameInstance := new(GameInstance)
-	gameInstance.InputEventChan = make(chan event.GameEvent)
-	gameInstance.OutputEventChan = make(chan event.GameOutputEvent)
-
-	gameInstance.openAtSeconds = openAtSeconds
-	gameInstance.closesAtSeconds = openAtSeconds + DurationHours*60*60
-	gameInstance.players = make(map[int]*Player)
-	gameInstance.registeredPlayers = make(map[int]PlayerState)
-	gameInstance.floors = Floors
-	gameInstance.monsters = Monsters
-
-	return gameInstance, nil
 }
 
 type PlayerAndIdPair = struct {
@@ -189,4 +132,38 @@ func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
 	})
 
 	return playersSlice
+}
+
+func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours int) (*GameInstance, error) {
+	if Floors <= 0 {
+		return nil, fmt.Errorf("Floor count should be greater than 0")
+	}
+	if Monsters < 0 {
+		return nil, fmt.Errorf("Monsters count should be greater or equal to 0")
+	}
+	if DurationHours <= 0 {
+		return nil, fmt.Errorf("DurationHours should be greater than 0")
+	}
+
+	seconds, minutes, hours := 0, 0, 0
+	n, err := fmt.Sscanf(OpenAt, "%d:%d:%d", &hours, &minutes, &seconds)
+
+	if err != nil || n != 3 {
+		return nil, fmt.Errorf("Failed to parse dungeon open time")
+	}
+
+	openAtSeconds := seconds + minutes*60 + hours*60*60
+
+	gameInstance := new(GameInstance)
+	gameInstance.InputEventChan = make(chan event.GameEvent)
+	gameInstance.OutputEventChan = make(chan event.GameOutputEvent)
+
+	gameInstance.openAtSeconds = openAtSeconds
+	gameInstance.closesAtSeconds = openAtSeconds + DurationHours*60*60
+	gameInstance.players = make(map[int]*Player)
+	gameInstance.registeredPlayers = make(map[int]PlayerState)
+	gameInstance.floors = Floors
+	gameInstance.monsters = Monsters
+
+	return gameInstance, nil
 }

@@ -5,17 +5,6 @@ import (
 	"fmt"
 )
 
-func ImpossibleMove(newEvent *event.GameEvent, gameInstance *GameInstance) {
-	gameInstance.OutputEventChan <- event.GameOutputEvent{
-		Event: event.GameEvent{
-			OccuredAtSecond: newEvent.OccuredAtSecond,
-			PlayerId:        newEvent.PlayerId,
-			EventId:         event.PlayerMakesImposibleMove,
-			ExtraParam:      int(newEvent.EventId),
-		},
-	}
-}
-
 type playerEventHandler func(eventPlayer *Player, event *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error)
 
 var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandler{
@@ -23,7 +12,7 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 		isLastFloor := len(eventPlayer.Floors)-1 == eventPlayer.CurrentFloor
 
 		if isLastFloor {
-			ImpossibleMove(newEvent, gameInstance)
+			gameInstance.ImpossibleMove(newEvent)
 			return nil, fmt.Errorf("Cant go next floor: already at last")
 		}
 		currentFloor := eventPlayer.Floors[eventPlayer.CurrentFloor]
@@ -44,7 +33,7 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 		isFirstFloor := eventPlayer.CurrentFloor == 0
 
 		if isFirstFloor {
-			ImpossibleMove(newEvent, gameInstance)
+			gameInstance.ImpossibleMove(newEvent)
 			return nil, fmt.Errorf("Cant go prev floor: already at first")
 		}
 		currentFloor := eventPlayer.Floors[eventPlayer.CurrentFloor]
@@ -95,7 +84,7 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 		floorInstance := eventPlayer.Floors[eventPlayer.CurrentFloor]
 
 		if floorInstance.MonsterCount <= 0 {
-			ImpossibleMove(newEvent, gameInstance)
+			gameInstance.ImpossibleMove(newEvent)
 			return nil, fmt.Errorf("Player %d cant kill: no monsters on the floor %d", eventPlayer.Id, eventPlayer.CurrentFloor)
 		}
 
@@ -115,7 +104,7 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 		isBossFloor := currentFloor.BossFloor
 
 		if !isBossFloor {
-			ImpossibleMove(newEvent, gameInstance)
+			gameInstance.ImpossibleMove(newEvent)
 			return nil, fmt.Errorf("Player %d cant kill boss: not on the boss floor %d", eventPlayer.Id, eventPlayer.CurrentFloor)
 		}
 
@@ -151,7 +140,7 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 		isBossFloor := currentFloor.BossFloor
 
 		if !isBossFloor {
-			ImpossibleMove(newEvent, gameInstance)
+			gameInstance.ImpossibleMove(newEvent)
 			return nil, fmt.Errorf("Player %d cant enter boss: not on the boss floor %d", eventPlayer.Id, eventPlayer.CurrentFloor)
 		}
 

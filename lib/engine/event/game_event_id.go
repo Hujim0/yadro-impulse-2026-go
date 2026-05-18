@@ -1,12 +1,10 @@
 package event
 
 import (
-	"dungeonGameLib/lib/engine/formatting"
 	"fmt"
-	"strings"
 )
 
-type GameEventId int
+type GameEventId uint
 
 const (
 	PlayerRegistered GameEventId = iota + 1
@@ -61,55 +59,3 @@ var EventTypeToFormatString = map[GameEventId]string{
 	PlayerDead:               "Player [%d] is dead",
 	PlayerMakesImposibleMove: "Player [%d] makes imposible move [%d]",
 }
-
-type GameEvent struct {
-	OccuredAtSecond int
-	PlayerId        int
-	EventId         GameEventId
-	ExtraParam      int
-}
-
-type GameOutputEvent struct {
-	Event       GameEvent
-	Error       error
-	ReadOneMore bool
-}
-
-func (gameEvent GameEvent) String() string {
-	str, ok := EventTypeToFormatString[gameEvent.EventId]
-
-	if !ok {
-		return "Unknown event"
-	}
-
-	timeStamp := fmt.Sprintf("[%s] ", formatting.SecondsToFormattedDate(gameEvent.OccuredAtSecond))
-
-	eventDescription := strings.Split(fmt.Sprintf(str+"\n", gameEvent.PlayerId, gameEvent.ExtraParam), "\n")[0]
-
-	return timeStamp + eventDescription
-}
-
-type GameEventMetaType int
-
-var EventTypeToMetaTypeEvent = map[GameEventId]GameEventMetaType{
-	PlayerRegistered:     DungeonMetaTypeEvent,
-	PlayerEntered:        DungeonMetaTypeEvent,
-	PlayerKilled:         PlayerMetaTypeEvent,
-	PlayerWentNext:       PlayerMetaTypeEvent,
-	PlayerWentPrev:       PlayerMetaTypeEvent,
-	PlayerEnteredBoss:    PlayerMetaTypeEvent,
-	PlayerKilledBoss:     PlayerMetaTypeEvent,
-	PlayerLeftDungeon:    PlayerMetaTypeEvent,
-	PlayerCannotContinue: PlayerMetaTypeEvent,
-	PlayerGotHealed:      PlayerMetaTypeEvent,
-	PlayerGotDamaged:     PlayerMetaTypeEvent,
-
-	PlayerDisqualified:       DungeonMetaTypeEvent,
-	PlayerDead:               DungeonMetaTypeEvent,
-	PlayerMakesImposibleMove: DungeonMetaTypeEvent,
-}
-
-const (
-	PlayerMetaTypeEvent GameEventMetaType = iota
-	DungeonMetaTypeEvent
-)
