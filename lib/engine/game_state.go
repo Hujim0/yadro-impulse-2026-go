@@ -2,6 +2,7 @@ package engine
 
 import (
 	"cmp"
+	playerstate "dungeonGameLib/lib/engine/player_state"
 	"fmt"
 	"slices"
 )
@@ -10,7 +11,7 @@ type GameInstance struct {
 	InputEventChan    chan GameEvent
 	OutputEventChan   chan GameOutput
 	players           map[int]*Player
-	registeredPlayers map[int]PlayerState
+	registeredPlayers map[int]playerstate.PlayerState
 	openAtSeconds     int
 	closesAtSeconds   int
 	floors            int
@@ -48,7 +49,7 @@ func (gameInstance *GameInstance) RunGameLoop() {
 				continue
 			}
 
-			if player.State != IN_GAME && player.State != SUCCESS {
+			if player.State != playerstate.IN_GAME && player.State != playerstate.SUCCESS {
 				gameInstance.OutputEventChan <- GameOutput{
 					Error: fmt.Errorf("Player state is wrong: %s but should be \"IN_GAME\"", player.State),
 				}
@@ -94,14 +95,14 @@ var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
 			return nil, fmt.Errorf("the dungeon is closed! cant register.")
 		}
 
-		gameInstance.registeredPlayers[event.PlayerId] = REGISTERED
+		gameInstance.registeredPlayers[event.PlayerId] = playerstate.REGISTERED
 		return nil, nil
 	},
 	PlayerEntered: func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
 		_, ok := gameInstance.registeredPlayers[event.PlayerId]
 
 		if !ok {
-			gameInstance.registeredPlayers[event.PlayerId] = DISQUAL
+			gameInstance.registeredPlayers[event.PlayerId] = playerstate.DISQUAL
 			disqualifiedEvent := GameEvent{
 				OccuredAtSecond: event.OccuredAtSecond,
 				PlayerId:        event.PlayerId,
@@ -114,7 +115,7 @@ var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
 		newPlayerInstance.floors[0].lastTimeEnteredSeconds = event.OccuredAtSecond
 
 		gameInstance.players[event.PlayerId] = newPlayerInstance
-		gameInstance.registeredPlayers[event.PlayerId] = IN_GAME
+		gameInstance.registeredPlayers[event.PlayerId] = playerstate.IN_GAME
 
 		return nil, nil
 	},
@@ -147,7 +148,7 @@ func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours i
 	gameInstance.openAtSeconds = openAtSeconds
 	gameInstance.closesAtSeconds = openAtSeconds + DurationHours*60*60
 	gameInstance.players = make(map[int]*Player)
-	gameInstance.registeredPlayers = make(map[int]PlayerState)
+	gameInstance.registeredPlayers = make(map[int]playerstate.PlayerState)
 	gameInstance.floors = Floors
 	gameInstance.monsters = Monsters
 
@@ -165,9 +166,9 @@ func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
 	playersSlice := make([]PlayerAndIdPair, playerCount)
 	i := 0
 	for id, state := range gameInstance.registeredPlayers {
-		if state == DISQUAL {
+		if state == playerstate.DISQUAL {
 			newDisqualifiedPlayer := createNewPlayer(0, id, 0, 0)
-			newDisqualifiedPlayer.State = DISQUAL
+			newDisqualifiedPlayer.State = playerstate.DISQUAL
 			playersSlice[i] = PlayerAndIdPair{id, newDisqualifiedPlayer}
 			i++
 		} else {

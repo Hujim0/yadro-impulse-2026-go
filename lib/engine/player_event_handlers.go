@@ -1,6 +1,9 @@
 package engine
 
-import "fmt"
+import (
+	playerstate "dungeonGameLib/lib/engine/player_state"
+	"fmt"
+)
 
 func impossibleMove(event *GameEvent, gameInstance *GameInstance) {
 	gameInstance.OutputEventChan <- GameOutput{
@@ -76,7 +79,7 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 		}
 
 		player.Hp = 0
-		player.State = FAIL
+		player.State = playerstate.FAIL
 
 		playerDeadEvent := GameEvent{
 			OccuredAtSecond: event.OccuredAtSecond,
@@ -125,8 +128,8 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 	},
 	PlayerLeftDungeon: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
 
-		if player.State != SUCCESS {
-			player.State = FAIL
+		if player.State != playerstate.SUCCESS {
+			player.State = playerstate.FAIL
 
 		}
 		player.ExitedDungeonAtSeconds = event.OccuredAtSecond
@@ -136,7 +139,7 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 		return nil, nil
 	},
 	PlayerCannotContinue: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		player.State = FAIL
+		player.State = playerstate.FAIL
 		player.ExitedDungeonAtSeconds = event.OccuredAtSecond
 
 		currentFloor := player.floors[player.CurrentFloor]

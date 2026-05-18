@@ -1,35 +1,9 @@
 package engine
 
-type PlayerState int
-
-const (
-	IN_GAME PlayerState = iota
-	SUCCESS
-	FAIL
-	DISQUAL
-	REGISTERED
-)
-
-var PlayerStateToString = map[PlayerState]string{
-	IN_GAME:    "IN_GAME",
-	SUCCESS:    "SUCCESS",
-	FAIL:       "FAIL",
-	DISQUAL:    "DISQUAL",
-	REGISTERED: "REGISTERED",
-}
-
-func (s PlayerState) String() string {
-	str, ok := PlayerStateToString[s]
-
-	if ok {
-		return str
-	}
-
-	return "Unknown"
-}
+import playerstate "dungeonGameLib/lib/engine/player_state"
 
 type Player struct {
-	State                   PlayerState
+	State                   playerstate.PlayerState
 	Id                      int
 	Hp                      int
 	CurrentFloor            int
@@ -42,7 +16,7 @@ type Player struct {
 func createNewPlayer(currentTime int, id int, Floors int, Monsters int) *Player {
 	newPlayer := new(Player)
 	newPlayer.Hp = 100
-	newPlayer.State = IN_GAME
+	newPlayer.State = playerstate.IN_GAME
 	newPlayer.EnteredDungeonAtSeconds = currentTime
 	newPlayer.Id = id
 
@@ -70,7 +44,7 @@ func (player *Player) updateCompletedGameState() {
 		}
 	}
 
-	player.State = SUCCESS
+	player.State = playerstate.SUCCESS
 }
 
 func (player *Player) getAverageFloorTimeSeconds() int {
