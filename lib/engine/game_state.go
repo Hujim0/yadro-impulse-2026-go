@@ -56,9 +56,13 @@ func (gameInstance *GameInstance) RunGameLoop() {
 				continue
 			}
 
-			err := player.handleEvent(&newEvent, gameInstance)
+			outputEvent, err := player.handleEvent(&newEvent, gameInstance)
 			if err == nil {
 				gameInstance.OutputEventChan <- newEvent
+			}
+
+			if outputEvent != nil {
+				gameInstance.OutputEventChan <- *outputEvent
 			}
 		case DungeonMetaTypeEvent:
 			handler, ok := DungeonEventTypeToPlayerEventHandler[newEvent.EventId]
@@ -66,39 +70,43 @@ func (gameInstance *GameInstance) RunGameLoop() {
 				fmt.Println("Handler not found for event", newEvent.EventId)
 			}
 
-			err := handler(&newEvent, gameInstance)
+			outputEvent, err := handler(&newEvent, gameInstance)
 			if err == nil {
 				gameInstance.OutputEventChan <- newEvent
+			}
+
+			if outputEvent != nil {
+				gameInstance.OutputEventChan <- *outputEvent
 			}
 		}
 	}
 }
 
-type DungeonEventHandler func(event *GameEvent, gameInstance *GameInstance) error
+type DungeonEventHandler func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error)
 
 var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
-	PlayerRegistered: func(event *GameEvent, gameInstance *GameInstance) error {
+	PlayerRegistered: func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
 		if event.OccuredAtSecond > gameInstance.closesAtSeconds {
-			return fmt.Errorf("the dungeon is closed! cant register.")
+			return nil, fmt.Errorf("the dungeon is closed! cant register.")
 		}
 
 		gameInstance.registeredPlayers[event.PlayerId] = true
-		return nil
+		return nil, nil
 	},
-	PlayerEntered: func(event *GameEvent, gameInstance *GameInstance) error {
+	PlayerEntered: func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
 		_, ok := gameInstance.registeredPlayers[event.PlayerId]
 
 		if !ok {
-			gameInstance.OutputEventChan <- GameEvent{
+			disqualifiedEvent := GameEvent{
 				OccuredAtSecond: event.OccuredAtSecond,
 				PlayerId:        event.PlayerId,
 				EventId:         PlayerDisqualified,
 			}
-			return fmt.Errorf("Only registered players are allowed to participate in the challenge")
+			return &disqualifiedEvent, fmt.Errorf("Only registered players are allowed to participate in the challenge")
 		}
 
 		gameInstance.players[event.PlayerId] = createNewPlayer(event.OccuredAtSecond, event.PlayerId)
-		return nil
+		return nil, nil
 	},
 }
 
