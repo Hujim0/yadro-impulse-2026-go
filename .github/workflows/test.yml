@@ -1,0 +1,25 @@
+name: Go Test CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run Tests
+        run: go test -v -race -coverprofile=coverage.txt ./...
+
+      - name: Verify coverage
+        run: go tool cover -func=coverage.txt
