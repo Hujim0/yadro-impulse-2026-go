@@ -48,25 +48,19 @@ func main() {
 
 	go gameInstance.RunGameLoop()
 
-	go func() {
-		for true {
-			fmt.Println(<-gameInstance.OutputEventChan)
-		}
-	}()
-
 	defer func() {
 		for _, pair := range gameInstance.CompilePlayerData() {
 			fmt.Println(pair.Player)
 		}
 	}()
 
-	if err := processReader(os.Stdin, gameInstance.InputEventChan); err != nil {
+	if err := processReader(os.Stdin, gameInstance.InputEventChan, gameInstance.OutputEventChan); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func processReader(r io.Reader, inputEventChan chan engine.GameEvent) error {
+func processReader(r io.Reader, inputEventChan chan engine.GameEvent, outputEvenChan chan engine.GameOutput) error {
 	reader := bufio.NewReader(r)
 	lineNum := 0
 
@@ -95,6 +89,19 @@ func processReader(r io.Reader, inputEventChan chan engine.GameEvent) error {
 		}
 
 		inputEventChan <- event
+
+		for {
+			output := <-outputEvenChan
+			if output.Error != nil {
+				fmt.Println(output.Error)
+			} else {
+				fmt.Println(output.Event)
+			}
+
+			if !output.ReadOneMore {
+				break
+			}
+		}
 	}
 
 	return nil

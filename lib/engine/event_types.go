@@ -68,6 +68,12 @@ type GameEvent struct {
 	ExtraParam      int
 }
 
+type GameOutput struct {
+	Event       GameEvent
+	Error       error
+	ReadOneMore bool
+}
+
 func (gameEvent GameEvent) String() string {
 	str, ok := EventTypeToFormatString[gameEvent.EventId]
 

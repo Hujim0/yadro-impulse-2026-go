@@ -3,11 +3,13 @@ package engine
 import "fmt"
 
 func impossibleMove(event *GameEvent, gameInstance *GameInstance) {
-	gameInstance.OutputEventChan <- GameEvent{
-		OccuredAtSecond: event.OccuredAtSecond,
-		PlayerId:        event.PlayerId,
-		EventId:         PlayerMakesImposibleMove,
-		ExtraParam:      int(event.EventId),
+	gameInstance.OutputEventChan <- GameOutput{
+		Event: GameEvent{
+			OccuredAtSecond: event.OccuredAtSecond,
+			PlayerId:        event.PlayerId,
+			EventId:         PlayerMakesImposibleMove,
+			ExtraParam:      int(event.EventId),
+		},
 	}
 }
 
@@ -100,39 +102,51 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 	},
 
 	PlayerKilledBoss: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		isBossFloor := player.floors[player.CurrentFloor].bossFloor
+		currentFloor := player.floors[player.CurrentFloor]
+		isBossFloor := currentFloor.bossFloor
 
 		if !isBossFloor {
 			impossibleMove(event, gameInstance)
 			return nil, fmt.Errorf("Player %d cant kill boss: not on the boss floor %d", player.Id, player.CurrentFloor)
 		}
 
-		player.floors[len(player.floors)-1].bossDefeated = true
+		currentFloor.bossDefeated = true
+		currentFloor.totalTimeSpentSeconds = event.OccuredAtSecond - currentFloor.lastTimeEnteredSeconds
+		player.BossKillDurationSeconds = currentFloor.totalTimeSpentSeconds
 		player.updateCompletedGameState()
 
 		return nil, nil
 	},
 	PlayerLeftDungeon: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		player.ExitedDungeonAtSeconds = event.OccuredAtSecond
 
 		if player.State != SUCCESS {
 			player.State = FAIL
+
 		}
+		player.ExitedDungeonAtSeconds = event.OccuredAtSecond
+
+		currentFloor := player.floors[player.CurrentFloor]
+		currentFloor.totalTimeSpentSeconds = event.OccuredAtSecond - currentFloor.lastTimeEnteredSeconds
 		return nil, nil
 	},
 	PlayerCannotContinue: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		player.ExitedDungeonAtSeconds = event.OccuredAtSecond
 		player.State = FAIL
+		player.ExitedDungeonAtSeconds = event.OccuredAtSecond
 
+		currentFloor := player.floors[player.CurrentFloor]
+		currentFloor.totalTimeSpentSeconds = event.OccuredAtSecond - currentFloor.lastTimeEnteredSeconds
 		return nil, nil
 	},
 	PlayerEnteredBoss: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		isBossFloor := player.floors[player.CurrentFloor].bossFloor
+		currentFloor := player.floors[player.CurrentFloor]
+		isBossFloor := currentFloor.bossFloor
 
 		if !isBossFloor {
 			impossibleMove(event, gameInstance)
 			return nil, fmt.Errorf("Player %d cant enter boss: not on the boss floor %d", player.Id, player.CurrentFloor)
 		}
+
+		currentFloor.lastTimeEnteredSeconds = event.OccuredAtSecond
 
 		return nil, nil
 	},

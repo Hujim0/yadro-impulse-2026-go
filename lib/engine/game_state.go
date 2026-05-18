@@ -8,7 +8,7 @@ import (
 
 type GameInstance struct {
 	InputEventChan    chan GameEvent
-	OutputEventChan   chan GameEvent
+	OutputEventChan   chan GameOutput
 	players           map[int]*Player
 	registeredPlayers map[int]PlayerState
 	openAtSeconds     int
@@ -24,7 +24,9 @@ func (gameInstance *GameInstance) RunGameLoop() {
 		eventMetaType, ok := EventTypeToMetaTypeEvent[newEvent.EventId]
 
 		if !ok {
-			fmt.Println("Event metadata not found for the event:", newEvent.EventId)
+			gameInstance.OutputEventChan <- GameOutput{
+				Error: fmt.Errorf("Event metadata not found for the event: %d", newEvent.EventId),
+			}
 			continue
 		}
 
@@ -33,37 +35,45 @@ func (gameInstance *GameInstance) RunGameLoop() {
 			player, ok := gameInstance.players[newEvent.PlayerId]
 
 			if !ok {
-				fmt.Println("Player with id", newEvent.PlayerId, "not found.")
+				gameInstance.OutputEventChan <- GameOutput{
+					Error: fmt.Errorf("Player with id %d not found", newEvent.PlayerId),
+				}
 				continue
 			}
 
 			if player.State != IN_GAME && player.State != SUCCESS {
-				fmt.Println("Player state is wrong:", player.State, "but should be \"IN_GAME\"")
+				gameInstance.OutputEventChan <- GameOutput{
+					Error: fmt.Errorf("Player state is wrong: %s but should be \"IN_GAME\"", player.State),
+				}
 				impossibleMove(&newEvent, gameInstance)
 				continue
 			}
 
 			outputEvent, err := player.handleEvent(&newEvent, gameInstance)
 			if err == nil {
-				gameInstance.OutputEventChan <- newEvent
+				readOneMore := outputEvent != nil
+				gameInstance.OutputEventChan <- GameOutput{Event: newEvent, ReadOneMore: readOneMore}
 			}
 
 			if outputEvent != nil {
-				gameInstance.OutputEventChan <- *outputEvent
+				gameInstance.OutputEventChan <- GameOutput{Event: *outputEvent}
 			}
 		case DungeonMetaTypeEvent:
 			handler, ok := DungeonEventTypeToPlayerEventHandler[newEvent.EventId]
 			if !ok {
-				fmt.Println("Handler not found for event", newEvent.EventId)
+				gameInstance.OutputEventChan <- GameOutput{
+					Error: fmt.Errorf("Handler not found for event %d", newEvent.EventId),
+				}
 			}
 
 			outputEvent, err := handler(&newEvent, gameInstance)
 			if err == nil {
-				gameInstance.OutputEventChan <- newEvent
+				readOneMore := outputEvent != nil
+				gameInstance.OutputEventChan <- GameOutput{Event: newEvent, ReadOneMore: readOneMore}
 			}
 
 			if outputEvent != nil {
-				gameInstance.OutputEventChan <- *outputEvent
+				gameInstance.OutputEventChan <- GameOutput{Event: *outputEvent}
 			}
 		}
 	}
@@ -125,7 +135,7 @@ func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours i
 
 	gameInstance := new(GameInstance)
 	gameInstance.InputEventChan = make(chan GameEvent)
-	gameInstance.OutputEventChan = make(chan GameEvent)
+	gameInstance.OutputEventChan = make(chan GameOutput)
 
 	gameInstance.openAtSeconds = openAtSeconds
 	gameInstance.closesAtSeconds = openAtSeconds + DurationHours*60*60
