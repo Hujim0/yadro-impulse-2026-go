@@ -110,11 +110,11 @@ var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
 			return &disqualifiedEvent, fmt.Errorf("Only registered players are allowed to participate in the challenge")
 		}
 
-		gameInstance.players[event.PlayerId] = createNewPlayer(event.OccuredAtSecond, event.PlayerId, gameInstance.floors, gameInstance.monsters)
-		gameInstance.registeredPlayers[event.PlayerId] = IN_GAME
+		newPlayerInstance := createNewPlayer(event.OccuredAtSecond, event.PlayerId, gameInstance.floors, gameInstance.monsters)
+		newPlayerInstance.floors[0].lastTimeEnteredSeconds = event.OccuredAtSecond
 
-		player := gameInstance.players[event.PlayerId]
-		player.floors[0].lastTimeEnteredSeconds = event.OccuredAtSecond
+		gameInstance.players[event.PlayerId] = newPlayerInstance
+		gameInstance.registeredPlayers[event.PlayerId] = IN_GAME
 
 		return nil, nil
 	},
