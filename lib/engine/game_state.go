@@ -35,6 +35,13 @@ func (gameInstance *GameInstance) RunGameLoop() {
 			player, ok := gameInstance.players[newEvent.PlayerId]
 
 			if !ok {
+				if _, disqualified := gameInstance.registeredPlayers[newEvent.PlayerId]; disqualified {
+					gameInstance.OutputEventChan <- GameOutput{
+						Error: fmt.Errorf("Player %d is disqualified and cannot perform actions", newEvent.PlayerId),
+					}
+					continue
+				}
+
 				gameInstance.OutputEventChan <- GameOutput{
 					Error: fmt.Errorf("Player with id %d not found", newEvent.PlayerId),
 				}
@@ -94,17 +101,21 @@ var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
 		_, ok := gameInstance.registeredPlayers[event.PlayerId]
 
 		if !ok {
+			gameInstance.registeredPlayers[event.PlayerId] = DISQUAL
 			disqualifiedEvent := GameEvent{
 				OccuredAtSecond: event.OccuredAtSecond,
 				PlayerId:        event.PlayerId,
 				EventId:         PlayerDisqualified,
 			}
-			gameInstance.registeredPlayers[event.PlayerId] = DISQUAL
 			return &disqualifiedEvent, fmt.Errorf("Only registered players are allowed to participate in the challenge")
 		}
 
 		gameInstance.players[event.PlayerId] = createNewPlayer(event.OccuredAtSecond, event.PlayerId, gameInstance.floors, gameInstance.monsters)
 		gameInstance.registeredPlayers[event.PlayerId] = IN_GAME
+
+		player := gameInstance.players[event.PlayerId]
+		player.floors[0].lastTimeEnteredSeconds = event.OccuredAtSecond
+
 		return nil, nil
 	},
 }
@@ -167,7 +178,9 @@ func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
 			player, ok := gameInstance.players[id]
 
 			if !ok {
-				fmt.Println("Registered player with id", id, "not found in player instances!")
+				gameInstance.OutputEventChan <- GameOutput{
+					Error: fmt.Errorf("Registered player with id %d not found in player instances!", id),
+				}
 			}
 			playersSlice[i] = PlayerAndIdPair{id, player}
 			i++
@@ -175,7 +188,7 @@ func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
 	}
 
 	slices.SortFunc(playersSlice, func(a, b PlayerAndIdPair) int {
-		return cmp.Compare(b.Id, b.Id)
+		return cmp.Compare(a.Id, b.Id)
 	})
 
 	return playersSlice

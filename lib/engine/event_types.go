@@ -49,7 +49,7 @@ var EventTypeToFormatString = map[GameEventId]string{
 	PlayerKilled:         "Player [%d] killed the monster",
 	PlayerWentNext:       "Player [%d] went to the next floor",
 	PlayerWentPrev:       "Player [%d] went to the previous floor",
-	PlayerEnteredBoss:    "Player [%d] entered the boss’s floor",
+	PlayerEnteredBoss:    "Player [%d] entered the boss's floor",
 	PlayerKilledBoss:     "Player [%d] killed the boss",
 	PlayerLeftDungeon:    "Player [%d] left the dungeon",
 	PlayerCannotContinue: "Player [%d] cannot continue due to [%d]",

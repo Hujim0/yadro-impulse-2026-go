@@ -49,6 +49,7 @@ func main() {
 	go gameInstance.RunGameLoop()
 
 	defer func() {
+		fmt.Println("\nFinal report:")
 		for _, pair := range gameInstance.CompilePlayerData() {
 			fmt.Println(pair.Player)
 		}
@@ -92,9 +93,7 @@ func processReader(r io.Reader, inputEventChan chan engine.GameEvent, outputEven
 
 		for {
 			output := <-outputEvenChan
-			if output.Error != nil {
-				fmt.Println(output.Error)
-			} else {
+			if output.Error == nil {
 				fmt.Println(output.Event)
 			}
 

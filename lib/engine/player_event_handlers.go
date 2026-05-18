@@ -97,6 +97,12 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 		}
 
 		floorInstance.monsterCount--
+
+		if floorInstance.monsterCount == 0 {
+			timeSpentOnCurrentFloorSeconds := event.OccuredAtSecond - floorInstance.lastTimeEnteredSeconds
+			floorInstance.totalTimeSpentSeconds += timeSpentOnCurrentFloorSeconds
+		}
+
 		player.updateCompletedGameState()
 		return nil, nil
 	},
