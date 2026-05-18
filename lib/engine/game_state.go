@@ -120,26 +120,22 @@ var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
 	},
 }
 
-func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours int) *GameInstance {
+func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours int) (*GameInstance, error) {
 	if Floors <= 0 {
-		fmt.Println("Floor count should be greater than 0")
-		return nil
+		return nil, fmt.Errorf("Floor count should be greater than 0")
 	}
 	if Monsters < 0 {
-		fmt.Println("Monsters count should be greater or equal to 0")
-		return nil
+		return nil, fmt.Errorf("Monsters count should be greater or equal to 0")
 	}
 	if DurationHours <= 0 {
-		fmt.Println("DurationHours should be greater than 0")
-		return nil
+		return nil, fmt.Errorf("DurationHours should be greater than 0")
 	}
 
 	seconds, minutes, hours := 0, 0, 0
 	n, err := fmt.Sscanf(OpenAt, "%d:%d:%d", &hours, &minutes, &seconds)
 
 	if err != nil || n != 3 {
-		fmt.Println("Failed to parse dungeon open time")
-		return nil
+		return nil, fmt.Errorf("Failed to parse dungeon open time")
 	}
 
 	openAtSeconds := seconds + minutes*60 + hours*60*60
@@ -155,7 +151,7 @@ func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours i
 	gameInstance.floors = Floors
 	gameInstance.monsters = Monsters
 
-	return gameInstance
+	return gameInstance, nil
 }
 
 type PlayerAndIdPair = struct {

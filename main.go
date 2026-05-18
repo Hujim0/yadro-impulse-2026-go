@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 )
@@ -40,11 +41,14 @@ func loadConfigFromArgs() (*GameConfig, error) {
 func main() {
 	config, err := loadConfigFromArgs()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	gameInstance := engine.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
+	gameInstance, err := engine.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	go gameInstance.RunGameLoop()
 
@@ -56,8 +60,7 @@ func main() {
 	}()
 
 	if err := processReader(os.Stdin, gameInstance.InputEventChan, gameInstance.OutputEventChan); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }
 

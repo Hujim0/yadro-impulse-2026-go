@@ -87,9 +87,9 @@ func TestGolden(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	gameInstance := engine.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
-	if gameInstance == nil {
-		t.Fatal("Failed to create game instance")
+	gameInstance, error := engine.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
+	if error != nil {
+		t.Fatal("Failed to create game instance:", error)
 	}
 
 	go gameInstance.RunGameLoop()

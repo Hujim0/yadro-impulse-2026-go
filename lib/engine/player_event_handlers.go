@@ -162,8 +162,7 @@ func (player *Player) handleEvent(event *GameEvent, gameInstance *GameInstance) 
 	fun, ok := PlayerEventTypeToPlayerEventHandler[event.EventId]
 
 	if !ok {
-		fmt.Printf("Player %d doesnt know how to handle %s\n", player.Id, event.EventId.String())
-		return nil, fmt.Errorf("handler not found for event %s", event.EventId.String())
+		return nil, fmt.Errorf("Player %d handler not found for event %s", player.Id, event.EventId.String())
 	}
 
 	return fun(player, event, gameInstance)
