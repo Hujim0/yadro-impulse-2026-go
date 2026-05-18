@@ -39,7 +39,7 @@ func (gameInstance *GameInstance) RunGameLoop() {
 
 			if player.State != IN_GAME && player.State != SUCCESS {
 				fmt.Println("Player state is wrong:", player.State, "but should be \"IN_GAME\"")
-				impossibleMove(player, &newEvent, gameInstance)
+				impossibleMove(&newEvent, gameInstance)
 				continue
 			}
 
@@ -146,21 +146,21 @@ func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
 	playerCount := len(gameInstance.registeredPlayers)
 
 	playersSlice := make([]PlayerAndIdPair, playerCount)
-
+	i := 0
 	for id, state := range gameInstance.registeredPlayers {
 		if state == DISQUAL {
 			newDisqualifiedPlayer := createNewPlayer(0, id, 0, 0)
 			newDisqualifiedPlayer.State = DISQUAL
-			zeroBasedId := id - 1
-			playersSlice[zeroBasedId] = PlayerAndIdPair{id, newDisqualifiedPlayer}
+			playersSlice[i] = PlayerAndIdPair{id, newDisqualifiedPlayer}
+			i++
 		} else {
 			player, ok := gameInstance.players[id]
 
 			if !ok {
 				fmt.Println("Registered player with id", id, "not found in player instances!")
 			}
-			zeroBasedId := id - 1
-			playersSlice[zeroBasedId] = PlayerAndIdPair{id, player}
+			playersSlice[i] = PlayerAndIdPair{id, player}
+			i++
 		}
 	}
 
