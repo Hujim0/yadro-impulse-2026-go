@@ -15,12 +15,7 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 			gameInstance.ImpossibleMove(newEvent)
 			return nil, fmt.Errorf("Cant go next floor: already at last")
 		}
-		currentFloor := eventPlayer.Floors[eventPlayer.CurrentFloor]
-
-		if !currentFloor.IsCompleted() {
-			timeSpentOnCurrentFloorSeconds := newEvent.OccuredAtSecond - currentFloor.LastTimeEnteredSeconds
-			currentFloor.TotalTimeSpentSeconds += timeSpentOnCurrentFloorSeconds
-		}
+		eventPlayer.LeaveFloor(newEvent.OccuredAtSecond)
 
 		eventPlayer.CurrentFloor++
 
@@ -36,12 +31,7 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 			gameInstance.ImpossibleMove(newEvent)
 			return nil, fmt.Errorf("Cant go prev floor: already at first")
 		}
-		currentFloor := eventPlayer.Floors[eventPlayer.CurrentFloor]
-
-		if !currentFloor.IsCompleted() {
-			timeSpentOnCurrentFloorSeconds := newEvent.OccuredAtSecond - currentFloor.LastTimeEnteredSeconds
-			currentFloor.TotalTimeSpentSeconds += timeSpentOnCurrentFloorSeconds
-		}
+		eventPlayer.LeaveFloor(newEvent.OccuredAtSecond)
 
 		eventPlayer.CurrentFloor--
 
@@ -91,8 +81,9 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 		floorInstance.MonsterCount--
 
 		if floorInstance.MonsterCount == 0 {
-			timeSpentOnCurrentFloorSeconds := newEvent.OccuredAtSecond - floorInstance.LastTimeEnteredSeconds
-			floorInstance.TotalTimeSpentSeconds += timeSpentOnCurrentFloorSeconds
+			// 6.  A floor is considered complete when all monsters or the boss have been killed;
+			// ***any time spent in that floor is no longer counted***
+			eventPlayer.UpdateTimeSpentOnCurrentFloor(newEvent.OccuredAtSecond)
 		}
 
 		eventPlayer.UpdateCompletedGameState()
@@ -119,20 +110,14 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 
 		if eventPlayer.State != SUCCESS {
 			eventPlayer.State = FAIL
-
 		}
-		eventPlayer.ExitedDungeonAtSeconds = newEvent.OccuredAtSecond
-
-		currentFloor := eventPlayer.Floors[eventPlayer.CurrentFloor]
-		currentFloor.TotalTimeSpentSeconds = newEvent.OccuredAtSecond - currentFloor.LastTimeEnteredSeconds
+		eventPlayer.LeaveDungeon(newEvent.OccuredAtSecond)
 		return nil, nil
 	},
 	event.PlayerCannotContinue: func(eventPlayer *Player, newEvent *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error) {
 		eventPlayer.State = FAIL
-		eventPlayer.ExitedDungeonAtSeconds = newEvent.OccuredAtSecond
+		eventPlayer.LeaveDungeon(newEvent.OccuredAtSecond)
 
-		currentFloor := eventPlayer.Floors[eventPlayer.CurrentFloor]
-		currentFloor.TotalTimeSpentSeconds = newEvent.OccuredAtSecond - currentFloor.LastTimeEnteredSeconds
 		return nil, nil
 	},
 	event.PlayerEnteredBoss: func(eventPlayer *Player, newEvent *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error) {
@@ -146,6 +131,8 @@ var PlayerEventTypeToPlayerEventHandler = map[event.GameEventId]playerEventHandl
 
 		currentFloor.LastTimeEnteredSeconds = newEvent.OccuredAtSecond
 
+		//3.  When entering the boss's floor, the player receives a notification
+		// skipped this rule because it didnt match the input events
 		return nil, nil
 	},
 }

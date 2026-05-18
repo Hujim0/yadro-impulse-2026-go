@@ -22,67 +22,88 @@ func (gameInstance *GameInstance) RunGameLoop() {
 	for true {
 		newEvent := <-gameInstance.InputEventChan
 
-		eventMetaType, ok := event.EventTypeToMetaTypeEvent[newEvent.EventId]
-
-		if !ok {
-			gameInstance.OutputEventChan <- event.GameOutputEvent{
-				Error: fmt.Errorf("Event metadata not found for the event: %d", newEvent.EventId),
-			}
-			continue
+		if newEvent.OccuredAtSecond >= gameInstance.closesAtSeconds {
+			gameInstance.CloseTheDungeon(newEvent.OccuredAtSecond)
+			gameInstance.ImpossibleMove(&newEvent)
+			break
 		}
 
-		switch eventMetaType {
-		case event.PlayerMetaTypeEvent:
-			player, ok := gameInstance.players[newEvent.PlayerId]
+		gameInstance.handleNewEvent(newEvent)
+	}
+}
 
-			if !ok {
-				if _, disqualified := gameInstance.registeredPlayers[newEvent.PlayerId]; disqualified {
-					gameInstance.OutputEventChan <- event.GameOutputEvent{
-						Error: fmt.Errorf("Player %d is disqualified and cannot perform actions", newEvent.PlayerId),
-					}
-					continue
-				}
+func (gameInstance *GameInstance) CloseTheDungeon(currentTimeSeconds int) {
+	for _, player := range gameInstance.players {
+		player.LeaveDungeon(currentTimeSeconds)
 
+		if player.State == IN_GAME {
+			player.State = FAIL
+		}
+	}
+}
+
+func (gameInstance *GameInstance) handleNewEvent(newEvent event.GameEvent) {
+
+	eventMetaType, ok := event.EventTypeToMetaTypeEvent[newEvent.EventId]
+
+	if !ok {
+		gameInstance.OutputEventChan <- event.GameOutputEvent{
+			Error: fmt.Errorf("Event metadata not found for the event: %d", newEvent.EventId),
+		}
+		return
+	}
+
+	switch eventMetaType {
+	case event.PlayerMetaTypeEvent:
+		player, ok := gameInstance.players[newEvent.PlayerId]
+
+		if !ok {
+			if _, disqualified := gameInstance.registeredPlayers[newEvent.PlayerId]; disqualified {
 				gameInstance.OutputEventChan <- event.GameOutputEvent{
-					Error: fmt.Errorf("Player with id %d not found", newEvent.PlayerId),
+					Error: fmt.Errorf("Player %d is disqualified and cannot perform actions", newEvent.PlayerId),
 				}
-				continue
+				return
 			}
 
-			if player.State != IN_GAME && player.State != SUCCESS {
-				gameInstance.OutputEventChan <- event.GameOutputEvent{
-					Error: fmt.Errorf("Player state is wrong: %s but should be \"IN_GAME\"", player.State),
-				}
-				gameInstance.ImpossibleMove(&newEvent)
-				continue
+			gameInstance.OutputEventChan <- event.GameOutputEvent{
+				Error: fmt.Errorf("Player with id %d not found", newEvent.PlayerId),
 			}
+			return
+		}
 
-			outputEvent, err := player.HandleEvent(&newEvent, gameInstance)
-			if err == nil {
-				readOneMore := outputEvent != nil
-				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: newEvent, ReadOneMore: readOneMore}
+		if player.State != IN_GAME && player.State != SUCCESS {
+			gameInstance.OutputEventChan <- event.GameOutputEvent{
+				Error: fmt.Errorf("Player state is wrong: %s but should be \"IN_GAME\"", player.State),
 			}
+			gameInstance.ImpossibleMove(&newEvent)
+			return
+		}
 
-			if outputEvent != nil {
-				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: *outputEvent}
-			}
-		case event.DungeonMetaTypeEvent:
-			handler, ok := DungeonEventTypeToPlayerEventHandler[newEvent.EventId]
-			if !ok {
-				gameInstance.OutputEventChan <- event.GameOutputEvent{
-					Error: fmt.Errorf("Handler not found for event %d", newEvent.EventId),
-				}
-			}
+		outputEvent, err := player.HandleEvent(&newEvent, gameInstance)
+		if err == nil {
+			readOneMore := outputEvent != nil
+			gameInstance.OutputEventChan <- event.GameOutputEvent{Event: newEvent, ReadOneMore: readOneMore}
+		}
 
-			outputEvent, err := handler(&newEvent, gameInstance)
-			if err == nil {
-				readOneMore := outputEvent != nil
-				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: newEvent, ReadOneMore: readOneMore}
+		if outputEvent != nil {
+			gameInstance.OutputEventChan <- event.GameOutputEvent{Event: *outputEvent}
+		}
+	case event.DungeonMetaTypeEvent:
+		handler, ok := DungeonEventTypeToPlayerEventHandler[newEvent.EventId]
+		if !ok {
+			gameInstance.OutputEventChan <- event.GameOutputEvent{
+				Error: fmt.Errorf("Handler not found for event %d", newEvent.EventId),
 			}
+		}
 
-			if outputEvent != nil {
-				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: *outputEvent}
-			}
+		outputEvent, err := handler(&newEvent, gameInstance)
+		if err == nil {
+			readOneMore := outputEvent != nil
+			gameInstance.OutputEventChan <- event.GameOutputEvent{Event: newEvent, ReadOneMore: readOneMore}
+		}
+
+		if outputEvent != nil {
+			gameInstance.OutputEventChan <- event.GameOutputEvent{Event: *outputEvent}
 		}
 	}
 }

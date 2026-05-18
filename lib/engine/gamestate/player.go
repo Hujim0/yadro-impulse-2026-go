@@ -94,3 +94,20 @@ func (player *Player) String() string {
 		player.Hp,
 	)
 }
+
+func (player *Player) LeaveDungeon(currentTime int) {
+	player.ExitedDungeonAtSeconds = currentTime
+	player.LeaveFloor(currentTime)
+}
+
+func (player *Player) LeaveFloor(currentTime int) {
+	currentFloor := player.Floors[player.CurrentFloor]
+	if !currentFloor.IsCompleted() {
+		player.UpdateTimeSpentOnCurrentFloor(currentTime)
+	}
+}
+
+func (player *Player) UpdateTimeSpentOnCurrentFloor(currentTime int) {
+	currentFloor := player.Floors[player.CurrentFloor]
+	currentFloor.TotalTimeSpentSeconds += currentTime - currentFloor.LastTimeEnteredSeconds
+}
