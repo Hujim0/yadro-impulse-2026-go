@@ -14,6 +14,10 @@ func ParseLine(line string) (event.GameEvent, error) {
 		return event.GameEvent{}, fmt.Errorf("invalid log format (too few arguments): %q", line)
 	}
 
+	if eventParam < 0 {
+		return event.GameEvent{}, fmt.Errorf("extra param cant be negative! %q", line)
+	}
+
 	eventType, err := event.ParseEventId(eventTypeInt)
 
 	if err != nil {
