@@ -1,9 +1,11 @@
 package engine
 
 type GameFloor struct {
-	monsterCount int
-	bossFloor    bool
-	bossDefeated bool
+	monsterCount           int
+	bossFloor              bool
+	bossDefeated           bool
+	totalTimeSpentSeconds  int
+	lastTimeEnteredSeconds int
 }
 
 func (floor GameFloor) IsCompleted() bool {

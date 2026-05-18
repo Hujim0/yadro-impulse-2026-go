@@ -1,33 +1,20 @@
 package engine
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 )
 
 type GameInstance struct {
 	InputEventChan    chan GameEvent
 	OutputEventChan   chan GameEvent
 	players           map[int]*Player
-	floors            []*GameFloor
-	registeredPlayers map[int]bool
+	registeredPlayers map[int]PlayerState
 	openAtSeconds     int
 	closesAtSeconds   int
-	isCompleted       bool
-}
-
-func (instance *GameInstance) IsCompleted() bool {
-	return instance.isCompleted
-}
-
-func (instance *GameInstance) updateCompletedGameState() {
-	for _, floor := range instance.floors {
-		if !floor.IsCompleted() {
-			instance.isCompleted = false
-			return
-		}
-	}
-
-	instance.isCompleted = true
+	floors            int
+	monsters          int
 }
 
 func (gameInstance *GameInstance) RunGameLoop() {
@@ -50,7 +37,7 @@ func (gameInstance *GameInstance) RunGameLoop() {
 				continue
 			}
 
-			if player.State != IN_GAME {
+			if player.State != IN_GAME && player.State != SUCCESS {
 				fmt.Println("Player state is wrong:", player.State, "but should be \"IN_GAME\"")
 				impossibleMove(player, &newEvent, gameInstance)
 				continue
@@ -90,7 +77,7 @@ var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
 			return nil, fmt.Errorf("the dungeon is closed! cant register.")
 		}
 
-		gameInstance.registeredPlayers[event.PlayerId] = true
+		gameInstance.registeredPlayers[event.PlayerId] = REGISTERED
 		return nil, nil
 	},
 	PlayerEntered: func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
@@ -102,10 +89,12 @@ var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
 				PlayerId:        event.PlayerId,
 				EventId:         PlayerDisqualified,
 			}
+			gameInstance.registeredPlayers[event.PlayerId] = DISQUAL
 			return &disqualifiedEvent, fmt.Errorf("Only registered players are allowed to participate in the challenge")
 		}
 
-		gameInstance.players[event.PlayerId] = createNewPlayer(event.OccuredAtSecond, event.PlayerId)
+		gameInstance.players[event.PlayerId] = createNewPlayer(event.OccuredAtSecond, event.PlayerId, gameInstance.floors, gameInstance.monsters)
+		gameInstance.registeredPlayers[event.PlayerId] = IN_GAME
 		return nil, nil
 	},
 }
@@ -140,22 +129,44 @@ func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours i
 
 	gameInstance.openAtSeconds = openAtSeconds
 	gameInstance.closesAtSeconds = openAtSeconds + DurationHours*60*60
-	gameInstance.isCompleted = false
 	gameInstance.players = make(map[int]*Player)
-	gameInstance.registeredPlayers = make(map[int]bool)
-	gameInstance.floors = make([]*GameFloor, Floors)
-
-	for i := range gameInstance.floors {
-		newFloor := new(GameFloor)
-		isBossFloor := i == Floors-1
-		if isBossFloor {
-			newFloor.bossFloor = true
-		} else {
-			newFloor.monsterCount = Monsters
-		}
-
-		gameInstance.floors[i] = newFloor
-	}
+	gameInstance.registeredPlayers = make(map[int]PlayerState)
+	gameInstance.floors = Floors
+	gameInstance.monsters = Monsters
 
 	return gameInstance
+}
+
+type PlayerAndIdPair = struct {
+	Id     int
+	Player *Player
+}
+
+func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
+	playerCount := len(gameInstance.registeredPlayers)
+
+	playersSlice := make([]PlayerAndIdPair, playerCount)
+
+	for id, state := range gameInstance.registeredPlayers {
+		if state == DISQUAL {
+			newDisqualifiedPlayer := createNewPlayer(0, id, 0, 0)
+			newDisqualifiedPlayer.State = DISQUAL
+			zeroBasedId := id - 1
+			playersSlice[zeroBasedId] = PlayerAndIdPair{id, newDisqualifiedPlayer}
+		} else {
+			player, ok := gameInstance.players[id]
+
+			if !ok {
+				fmt.Println("Registered player with id", id, "not found in player instances!")
+			}
+			zeroBasedId := id - 1
+			playersSlice[zeroBasedId] = PlayerAndIdPair{id, player}
+		}
+	}
+
+	slices.SortFunc(playersSlice, func(a, b PlayerAndIdPair) int {
+		return cmp.Compare(b.Id, b.Id)
+	})
+
+	return playersSlice
 }

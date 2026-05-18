@@ -54,6 +54,12 @@ func main() {
 		}
 	}()
 
+	defer func() {
+		for _, pair := range gameInstance.CompilePlayerData() {
+			fmt.Println(pair.Player)
+		}
+	}()
+
 	if err := processReader(os.Stdin, gameInstance.InputEventChan); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

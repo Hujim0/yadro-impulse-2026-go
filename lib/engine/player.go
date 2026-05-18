@@ -11,13 +11,15 @@ const (
 	SUCCESS
 	FAIL
 	DISQUAL
+	REGISTERED
 )
 
 var PlayerStateToString = map[PlayerState]string{
-	IN_GAME: "IN_GAME",
-	SUCCESS: "SUCCESS",
-	FAIL:    "FAIL",
-	DISQUAL: "DISQUAL",
+	IN_GAME:    "IN_GAME",
+	SUCCESS:    "SUCCESS",
+	FAIL:       "FAIL",
+	DISQUAL:    "DISQUAL",
+	REGISTERED: "REGISTERED",
 }
 
 func (s PlayerState) String() string {
@@ -40,6 +42,7 @@ type Player struct {
 	BossKillDurationSeconds                  int
 	EnteredDungeonAtSeconds                  int
 	ExitedDungeonAtSeconds                   int
+	floors                                   []*GameFloor
 }
 
 func impossibleMove(player *Player, event *GameEvent, gameInstance *GameInstance) {
@@ -55,7 +58,7 @@ type playerEventHandler func(player *Player, event *GameEvent, gameInstance *Gam
 
 var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 	PlayerWentNext: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		isLastFloor := len(gameInstance.floors)-1 == player.CurrentFloor
+		isLastFloor := len(player.floors)-1 == player.CurrentFloor
 
 		if isLastFloor {
 			impossibleMove(player, event, gameInstance)
@@ -106,7 +109,7 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 	},
 
 	PlayerKilled: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		floorInstance := gameInstance.floors[player.CurrentFloor]
+		floorInstance := player.floors[player.CurrentFloor]
 
 		if floorInstance.monsterCount <= 0 {
 			impossibleMove(player, event, gameInstance)
@@ -114,34 +117,32 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 		}
 
 		floorInstance.monsterCount--
-		gameInstance.updateCompletedGameState()
+		player.updateCompletedGameState()
 		return nil, nil
 	},
 
 	PlayerKilledBoss: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		isLastFloor := len(gameInstance.floors)-1 == player.CurrentFloor
-		if player.CurrentFloor >= len(gameInstance.floors) {
+		isLastFloor := len(player.floors)-1 == player.CurrentFloor
+		if player.CurrentFloor >= len(player.floors) {
 			return nil, fmt.Errorf("Current floor %d is out of bounds", player.CurrentFloor)
 		}
 
-		isBossFloor := gameInstance.floors[player.CurrentFloor].bossFloor
+		isBossFloor := player.floors[player.CurrentFloor].bossFloor
 
 		if !isLastFloor || !isBossFloor {
 			impossibleMove(player, event, gameInstance)
 			return nil, fmt.Errorf("Player %d cant kill boss: not on the boss floor %d", player.Id, player.CurrentFloor)
 		}
 
-		gameInstance.floors[len(gameInstance.floors)-1].bossDefeated = true
-		gameInstance.updateCompletedGameState()
+		player.floors[len(player.floors)-1].bossDefeated = true
+		player.updateCompletedGameState()
 
 		return nil, nil
 	},
 	PlayerLeftDungeon: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
 		player.ExitedDungeonAtSeconds = event.OccuredAtSecond
 
-		if gameInstance.IsCompleted() {
-			player.State = SUCCESS
-		} else {
+		if player.State != SUCCESS {
 			player.State = FAIL
 		}
 		return nil, nil
@@ -153,12 +154,12 @@ var PlayerEventTypeToPlayerEventHandler = map[GameEventId]playerEventHandler{
 		return nil, nil
 	},
 	PlayerEnteredBoss: func(player *Player, event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		isLastFloor := len(gameInstance.floors)-1 == player.CurrentFloor
-		if player.CurrentFloor >= len(gameInstance.floors) {
+		isLastFloor := len(player.floors)-1 == player.CurrentFloor
+		if player.CurrentFloor >= len(player.floors) {
 			return nil, fmt.Errorf("Current floor %d is out of bounds", player.CurrentFloor)
 		}
 
-		isBossFloor := gameInstance.floors[player.CurrentFloor].bossFloor
+		isBossFloor := player.floors[player.CurrentFloor].bossFloor
 
 		if !isLastFloor || !isBossFloor {
 			impossibleMove(player, event, gameInstance)
@@ -180,12 +181,36 @@ func (player *Player) handleEvent(event *GameEvent, gameInstance *GameInstance) 
 	return fun(player, event, gameInstance)
 }
 
-func createNewPlayer(currentTime int, id int) *Player {
+func createNewPlayer(currentTime int, id int, Floors int, Monsters int) *Player {
 	newPlayer := new(Player)
 	newPlayer.Hp = 100
 	newPlayer.State = IN_GAME
 	newPlayer.EnteredDungeonAtSeconds = currentTime
 	newPlayer.Id = id
 
+	newPlayer.floors = make([]*GameFloor, Floors)
+
+	for i := range newPlayer.floors {
+		newFloor := new(GameFloor)
+		isBossFloor := i == Floors-1
+		if isBossFloor {
+			newFloor.bossFloor = true
+		} else {
+			newFloor.monsterCount = Monsters
+		}
+
+		newPlayer.floors[i] = newFloor
+	}
+
 	return newPlayer
+}
+
+func (player *Player) updateCompletedGameState() {
+	for _, floor := range player.floors {
+		if !floor.IsCompleted() {
+			return
+		}
+	}
+
+	player.State = SUCCESS
 }
