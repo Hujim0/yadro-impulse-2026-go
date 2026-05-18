@@ -2,7 +2,8 @@ package main
 
 import (
 	"bufio"
-	"dungeonGameLib/lib/engine"
+	"dungeonGameLib/lib/engine/event"
+	"dungeonGameLib/lib/engine/gamestate"
 	"dungeonGameLib/lib/parser"
 	"encoding/json"
 	"fmt"
@@ -44,7 +45,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	gameInstance, err := engine.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
+	gameInstance, err := gamestate.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
 
 	if err != nil {
 		log.Fatal(err)
@@ -64,7 +65,7 @@ func main() {
 	}
 }
 
-func processReader(r io.Reader, inputEventChan chan engine.GameEvent, outputEvenChan chan engine.GameOutput) error {
+func processReader(r io.Reader, inputEventChan chan event.GameEvent, outputEvenChan chan event.GameOutputEvent) error {
 	reader := bufio.NewReader(r)
 	lineNum := 0
 

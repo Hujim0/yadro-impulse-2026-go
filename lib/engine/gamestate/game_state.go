@@ -1,17 +1,17 @@
-package engine
+package gamestate
 
 import (
 	"cmp"
-	playerstate "dungeonGameLib/lib/engine/player_state"
+	"dungeonGameLib/lib/engine/event"
 	"fmt"
 	"slices"
 )
 
 type GameInstance struct {
-	InputEventChan    chan GameEvent
-	OutputEventChan   chan GameOutput
+	InputEventChan    chan event.GameEvent
+	OutputEventChan   chan event.GameOutputEvent
 	players           map[int]*Player
-	registeredPlayers map[int]playerstate.PlayerState
+	registeredPlayers map[int]PlayerState
 	openAtSeconds     int
 	closesAtSeconds   int
 	floors            int
@@ -22,54 +22,54 @@ func (gameInstance *GameInstance) RunGameLoop() {
 	for true {
 		newEvent := <-gameInstance.InputEventChan
 
-		eventMetaType, ok := EventTypeToMetaTypeEvent[newEvent.EventId]
+		eventMetaType, ok := event.EventTypeToMetaTypeEvent[newEvent.EventId]
 
 		if !ok {
-			gameInstance.OutputEventChan <- GameOutput{
+			gameInstance.OutputEventChan <- event.GameOutputEvent{
 				Error: fmt.Errorf("Event metadata not found for the event: %d", newEvent.EventId),
 			}
 			continue
 		}
 
 		switch eventMetaType {
-		case PlayerMetaTypeEvent:
+		case event.PlayerMetaTypeEvent:
 			player, ok := gameInstance.players[newEvent.PlayerId]
 
 			if !ok {
 				if _, disqualified := gameInstance.registeredPlayers[newEvent.PlayerId]; disqualified {
-					gameInstance.OutputEventChan <- GameOutput{
+					gameInstance.OutputEventChan <- event.GameOutputEvent{
 						Error: fmt.Errorf("Player %d is disqualified and cannot perform actions", newEvent.PlayerId),
 					}
 					continue
 				}
 
-				gameInstance.OutputEventChan <- GameOutput{
+				gameInstance.OutputEventChan <- event.GameOutputEvent{
 					Error: fmt.Errorf("Player with id %d not found", newEvent.PlayerId),
 				}
 				continue
 			}
 
-			if player.State != playerstate.IN_GAME && player.State != playerstate.SUCCESS {
-				gameInstance.OutputEventChan <- GameOutput{
+			if player.State != IN_GAME && player.State != SUCCESS {
+				gameInstance.OutputEventChan <- event.GameOutputEvent{
 					Error: fmt.Errorf("Player state is wrong: %s but should be \"IN_GAME\"", player.State),
 				}
-				impossibleMove(&newEvent, gameInstance)
+				ImpossibleMove(&newEvent, gameInstance)
 				continue
 			}
 
-			outputEvent, err := player.handleEvent(&newEvent, gameInstance)
+			outputEvent, err := player.HandleEvent(&newEvent, gameInstance)
 			if err == nil {
 				readOneMore := outputEvent != nil
-				gameInstance.OutputEventChan <- GameOutput{Event: newEvent, ReadOneMore: readOneMore}
+				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: newEvent, ReadOneMore: readOneMore}
 			}
 
 			if outputEvent != nil {
-				gameInstance.OutputEventChan <- GameOutput{Event: *outputEvent}
+				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: *outputEvent}
 			}
-		case DungeonMetaTypeEvent:
+		case event.DungeonMetaTypeEvent:
 			handler, ok := DungeonEventTypeToPlayerEventHandler[newEvent.EventId]
 			if !ok {
-				gameInstance.OutputEventChan <- GameOutput{
+				gameInstance.OutputEventChan <- event.GameOutputEvent{
 					Error: fmt.Errorf("Handler not found for event %d", newEvent.EventId),
 				}
 			}
@@ -77,45 +77,45 @@ func (gameInstance *GameInstance) RunGameLoop() {
 			outputEvent, err := handler(&newEvent, gameInstance)
 			if err == nil {
 				readOneMore := outputEvent != nil
-				gameInstance.OutputEventChan <- GameOutput{Event: newEvent, ReadOneMore: readOneMore}
+				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: newEvent, ReadOneMore: readOneMore}
 			}
 
 			if outputEvent != nil {
-				gameInstance.OutputEventChan <- GameOutput{Event: *outputEvent}
+				gameInstance.OutputEventChan <- event.GameOutputEvent{Event: *outputEvent}
 			}
 		}
 	}
 }
 
-type DungeonEventHandler func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error)
+type DungeonEventHandler func(event *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error)
 
-var DungeonEventTypeToPlayerEventHandler = map[GameEventId]DungeonEventHandler{
-	PlayerRegistered: func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
+var DungeonEventTypeToPlayerEventHandler = map[event.GameEventId]DungeonEventHandler{
+	event.PlayerRegistered: func(event *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error) {
 		if event.OccuredAtSecond > gameInstance.closesAtSeconds {
 			return nil, fmt.Errorf("the dungeon is closed! cant register.")
 		}
 
-		gameInstance.registeredPlayers[event.PlayerId] = playerstate.REGISTERED
+		gameInstance.registeredPlayers[event.PlayerId] = REGISTERED
 		return nil, nil
 	},
-	PlayerEntered: func(event *GameEvent, gameInstance *GameInstance) (*GameEvent, error) {
-		_, ok := gameInstance.registeredPlayers[event.PlayerId]
+	event.PlayerEntered: func(newEvent *event.GameEvent, gameInstance *GameInstance) (*event.GameEvent, error) {
+		_, ok := gameInstance.registeredPlayers[newEvent.PlayerId]
 
 		if !ok {
-			gameInstance.registeredPlayers[event.PlayerId] = playerstate.DISQUAL
-			disqualifiedEvent := GameEvent{
-				OccuredAtSecond: event.OccuredAtSecond,
-				PlayerId:        event.PlayerId,
-				EventId:         PlayerDisqualified,
+			gameInstance.registeredPlayers[newEvent.PlayerId] = DISQUAL
+			disqualifiedEvent := event.GameEvent{
+				OccuredAtSecond: newEvent.OccuredAtSecond,
+				PlayerId:        newEvent.PlayerId,
+				EventId:         event.PlayerDisqualified,
 			}
 			return &disqualifiedEvent, fmt.Errorf("Only registered players are allowed to participate in the challenge")
 		}
 
-		newPlayerInstance := createNewPlayer(event.OccuredAtSecond, event.PlayerId, gameInstance.floors, gameInstance.monsters)
-		newPlayerInstance.floors[0].lastTimeEnteredSeconds = event.OccuredAtSecond
+		newPlayerInstance := CreateNewPlayer(newEvent.OccuredAtSecond, newEvent.PlayerId, gameInstance.floors, gameInstance.monsters)
+		newPlayerInstance.Floors[0].LastTimeEnteredSeconds = newEvent.OccuredAtSecond
 
-		gameInstance.players[event.PlayerId] = newPlayerInstance
-		gameInstance.registeredPlayers[event.PlayerId] = playerstate.IN_GAME
+		gameInstance.players[newEvent.PlayerId] = newPlayerInstance
+		gameInstance.registeredPlayers[newEvent.PlayerId] = IN_GAME
 
 		return nil, nil
 	},
@@ -142,13 +142,13 @@ func CreateGameInstance(Floors int, Monsters int, OpenAt string, DurationHours i
 	openAtSeconds := seconds + minutes*60 + hours*60*60
 
 	gameInstance := new(GameInstance)
-	gameInstance.InputEventChan = make(chan GameEvent)
-	gameInstance.OutputEventChan = make(chan GameOutput)
+	gameInstance.InputEventChan = make(chan event.GameEvent)
+	gameInstance.OutputEventChan = make(chan event.GameOutputEvent)
 
 	gameInstance.openAtSeconds = openAtSeconds
 	gameInstance.closesAtSeconds = openAtSeconds + DurationHours*60*60
 	gameInstance.players = make(map[int]*Player)
-	gameInstance.registeredPlayers = make(map[int]playerstate.PlayerState)
+	gameInstance.registeredPlayers = make(map[int]PlayerState)
 	gameInstance.floors = Floors
 	gameInstance.monsters = Monsters
 
@@ -166,16 +166,16 @@ func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
 	playersSlice := make([]PlayerAndIdPair, playerCount)
 	i := 0
 	for id, state := range gameInstance.registeredPlayers {
-		if state == playerstate.DISQUAL {
-			newDisqualifiedPlayer := createNewPlayer(0, id, 0, 0)
-			newDisqualifiedPlayer.State = playerstate.DISQUAL
+		if state == DISQUAL {
+			newDisqualifiedPlayer := CreateNewPlayer(0, id, 0, 0)
+			newDisqualifiedPlayer.State = DISQUAL
 			playersSlice[i] = PlayerAndIdPair{id, newDisqualifiedPlayer}
 			i++
 		} else {
 			player, ok := gameInstance.players[id]
 
 			if !ok {
-				gameInstance.OutputEventChan <- GameOutput{
+				gameInstance.OutputEventChan <- event.GameOutputEvent{
 					Error: fmt.Errorf("Registered player with id %d not found in player instances!", id),
 				}
 			}

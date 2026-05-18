@@ -3,7 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"dungeonGameLib/lib/engine"
+	"dungeonGameLib/lib/engine/event"
+	"dungeonGameLib/lib/engine/gamestate"
 	"dungeonGameLib/lib/parser"
 	"encoding/json"
 	"fmt"
@@ -35,7 +36,7 @@ func loadTestConfigFromFile(filePath string) (*TestGameConfig, error) {
 	return &config, nil
 }
 
-func testProcessReader(r io.Reader, inputEventChan chan engine.GameEvent, outputEvenChan chan engine.GameOutput) ([]string, error) {
+func testProcessReader(r io.Reader, inputEventChan chan event.GameEvent, outputEvenChan chan event.GameOutputEvent) ([]string, error) {
 	var outputs []string
 	reader := bufio.NewReader(r)
 	lineNum := 0
@@ -87,7 +88,7 @@ func TestGolden(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	gameInstance, error := engine.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
+	gameInstance, error := gamestate.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
 	if error != nil {
 		t.Fatal("Failed to create game instance:", error)
 	}

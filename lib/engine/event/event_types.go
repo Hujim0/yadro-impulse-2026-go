@@ -1,6 +1,7 @@
-package engine
+package event
 
 import (
+	"dungeonGameLib/lib/engine/formatting"
 	"fmt"
 	"strings"
 )
@@ -68,7 +69,7 @@ type GameEvent struct {
 	ExtraParam      int
 }
 
-type GameOutput struct {
+type GameOutputEvent struct {
 	Event       GameEvent
 	Error       error
 	ReadOneMore bool
@@ -81,7 +82,7 @@ func (gameEvent GameEvent) String() string {
 		return "Unknown event"
 	}
 
-	timeStamp := fmt.Sprintf("[%s] ", secondsToFormattedDate(gameEvent.OccuredAtSecond))
+	timeStamp := fmt.Sprintf("[%s] ", formatting.SecondsToFormattedDate(gameEvent.OccuredAtSecond))
 
 	eventDescription := strings.Split(fmt.Sprintf(str+"\n", gameEvent.PlayerId, gameEvent.ExtraParam), "\n")[0]
 

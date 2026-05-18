@@ -1,6 +1,6 @@
-package playerstate
+package gamestate
 
-type PlayerState int
+type PlayerState uint8
 
 const (
 	IN_GAME PlayerState = iota
