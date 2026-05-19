@@ -1,96 +1,23 @@
-package main
+package tests
 
 import (
-	"bufio"
 	"bytes"
-	"dungeonGameLib/lib/engine/event"
 	"dungeonGameLib/lib/engine/gamestate"
-	"dungeonGameLib/lib/parser"
-	"encoding/json"
-	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
 )
 
-type TestGameConfig struct {
-	Floors   int    `json:"Floors"`
-	Monsters int    `json:"Monsters"`
-	OpenAt   string `json:"OpenAt"`
-	Duration int    `json:"Duration"`
-}
-
-func loadTestConfigFromFile(filePath string) (*TestGameConfig, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("read config file: %w", err)
-	}
-
-	var config TestGameConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("parse JSON: %w", err)
-	}
-
-	return &config, nil
-}
-
-func testProcessReader(r io.Reader, inputEventChan chan event.GameEvent, outputEvenChan chan event.GameOutputEvent) ([]string, error) {
-	var outputs []string
-	reader := bufio.NewReader(r)
-	lineNum := 0
-
-	for {
-		lineNum++
-		line, err := reader.ReadString('\n')
-
-		if err != nil {
-			if err == io.EOF {
-				if line == "" {
-					break
-				}
-			} else {
-				return nil, fmt.Errorf("line %d: read error: %w", lineNum, err)
-			}
-		}
-
-		line = strings.TrimRight(line, "\r\n")
-		if line == "" {
-			continue
-		}
-
-		event, err := parser.ParseLine(line)
-		if err != nil {
-			return nil, fmt.Errorf("line %d: parse error: %w", lineNum, err)
-		}
-
-		inputEventChan <- event
-
-		for {
-			output := <-outputEvenChan
-			if output.Error == nil {
-				outputs = append(outputs, output.Event.String())
-			}
-
-			if !output.ReadOneMore {
-				break
-			}
-		}
-	}
-
-	return outputs, nil
-}
-
 func TestGolden(t *testing.T) {
-	config, err := loadTestConfigFromFile("test_config.json")
+	config, err := loadConfig("test_config.json")
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	gameInstance, error := gamestate.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
-	if error != nil {
-		t.Fatal("Failed to create game instance:", error)
+	gameInstance, err := gamestate.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
+	if err != nil {
+		t.Fatal("Failed to create game instance:", err)
 	}
 
 	go gameInstance.RunGameLoop()
@@ -108,7 +35,7 @@ func TestGolden(t *testing.T) {
 
 	outputs = append(outputs, "")
 	outputs = append(outputs, "Final report:")
-	for _, pair := range gameInstance.CompilePlayerData() {
+	for _, pair := range compilePlayerDataSafe(gameInstance) {
 		outputs = append(outputs, pair.Player.String())
 	}
 
@@ -135,7 +62,7 @@ func TestGolden(t *testing.T) {
 }
 
 func TestGoldenWithConfig(t *testing.T) {
-	cmd := exec.Command("go", "run", ".", "test_config.json")
+	cmd := exec.Command("go", "run", "../", "test_config.json")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

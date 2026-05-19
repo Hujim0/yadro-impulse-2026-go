@@ -5,7 +5,6 @@ import (
 	"dungeonGameLib/lib/engine/event"
 	"dungeonGameLib/lib/engine/gamestate"
 	"dungeonGameLib/lib/parser"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -13,40 +12,17 @@ import (
 	"strings"
 )
 
-type GameConfig struct {
-	Floors   int    `json:"Floors"`
-	Monsters int    `json:"Monsters"`
-	OpenAt   string `json:"OpenAt"`
-	Duration int    `json:"Duration"`
-}
-
-func loadConfigFromArgs() (*GameConfig, error) {
-	if len(os.Args) < 2 {
-		return nil, fmt.Errorf("usage: %s <config-file.json>", os.Args[0])
-	}
-	filePath := os.Args[1]
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("read config file: %w", err)
-	}
-
-	var config GameConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("parse JSON: %w", err)
-	}
-
-	return &config, nil
-}
-
 func main() {
-	config, err := loadConfigFromArgs()
+	if len(os.Args) < 2 {
+		log.Fatalf("usage: %s <config-file.json>", os.Args[0])
+	}
+
+	config, err := parser.LoadConfigFromFile(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	gameInstance, err := gamestate.CreateGameInstance(config.Floors, config.Monsters, config.OpenAt, config.Duration)
-
 	if err != nil {
 		log.Fatal(err)
 	}
