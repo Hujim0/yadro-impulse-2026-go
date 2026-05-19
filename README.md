@@ -16,6 +16,11 @@ go run . config.json < events
 go run ./monitor config.json < events
 ```
 
+## Watch demo
+
+https://github.com/user-attachments/assets/34586fdb-6383-4a51-916e-951c57fb4523
+
+
 # System prototype
 The prototype must be able to work with a configuration file and a set of external events of a certain format.
 Solution should contain golang (1.22 or newer) source file/files and unit tests (optional)
