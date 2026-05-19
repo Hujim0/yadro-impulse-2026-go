@@ -16,6 +16,7 @@ type GameInstance struct {
 	closesAtSeconds   int
 	floors            int
 	monsters          int
+	syncMode          bool
 }
 
 func (gameInstance *GameInstance) RunGameLoop() {
@@ -109,6 +110,9 @@ func (gameInstance *GameInstance) handleNewEvent(newEvent event.GameEvent) {
 }
 
 func (gameInstance *GameInstance) ImpossibleMove(newEvent *event.GameEvent) {
+	if gameInstance.syncMode {
+		return
+	}
 	gameInstance.OutputEventChan <- event.GameOutputEvent{
 		Event: event.GameEvent{
 			OccuredAtSecond: newEvent.OccuredAtSecond,
@@ -117,6 +121,53 @@ func (gameInstance *GameInstance) ImpossibleMove(newEvent *event.GameEvent) {
 			ExtraParam:      int(newEvent.EventId),
 		},
 	}
+}
+
+func (gameInstance *GameInstance) SetSyncMode() {
+	gameInstance.syncMode = true
+}
+
+func (gameInstance *GameInstance) ApplyEventSync(ev event.GameEvent) error {
+	if ev.OccuredAtSecond >= gameInstance.closesAtSeconds {
+		gameInstance.CloseTheDungeon(ev.OccuredAtSecond)
+		return fmt.Errorf("dungeon closed at %d", ev.OccuredAtSecond)
+	}
+
+	eventMetaType, ok := event.EventTypeToMetaTypeEvent[ev.EventId]
+	if !ok {
+		return fmt.Errorf("unknown event type: %d", ev.EventId)
+	}
+
+	switch eventMetaType {
+	case event.PlayerMetaTypeEvent:
+		player, ok := gameInstance.players[ev.PlayerId]
+		if !ok {
+			if _, disqualified := gameInstance.registeredPlayers[ev.PlayerId]; disqualified {
+				return fmt.Errorf("player %d is disqualified", ev.PlayerId)
+			}
+			return fmt.Errorf("player %d not found", ev.PlayerId)
+		}
+		if player.State != IN_GAME && player.State != SUCCESS {
+			gameInstance.ImpossibleMove(&ev)
+			return fmt.Errorf("player %d state is %s", ev.PlayerId, player.State)
+		}
+		_, err := player.HandleEvent(&ev, gameInstance)
+		return err
+
+	case event.DungeonMetaTypeEvent:
+		handler, ok := DungeonEventTypeToPlayerEventHandler[ev.EventId]
+		if !ok {
+			return fmt.Errorf("no handler for event %d", ev.EventId)
+		}
+		_, err := handler(&ev, gameInstance)
+		return err
+	}
+	return nil
+}
+
+func (gameInstance *GameInstance) GetPlayer(id int) (*Player, bool) {
+	p, ok := gameInstance.players[id]
+	return p, ok
 }
 
 type PlayerAndIdPair = struct {
@@ -130,18 +181,30 @@ func (gameInstance *GameInstance) CompilePlayerData() []PlayerAndIdPair {
 	playersSlice := make([]PlayerAndIdPair, playerCount)
 	i := 0
 	for id, state := range gameInstance.registeredPlayers {
-		if state == DISQUAL {
+		switch state {
+		case DISQUAL:
 			newDisqualifiedPlayer := CreateNewPlayer(0, id, 0, 0)
 			newDisqualifiedPlayer.State = DISQUAL
 			playersSlice[i] = PlayerAndIdPair{id, newDisqualifiedPlayer}
 			i++
-		} else {
+		case REGISTERED:
+			idlePlayer := CreateNewPlayer(0, id, 0, 0)
+			idlePlayer.State = REGISTERED
+			playersSlice[i] = PlayerAndIdPair{id, idlePlayer}
+			i++
+		default:
 			player, ok := gameInstance.players[id]
-
 			if !ok {
-				gameInstance.OutputEventChan <- event.GameOutputEvent{
-					Error: fmt.Errorf("Registered player with id %d not found in player instances!", id),
+				if !gameInstance.syncMode {
+					gameInstance.OutputEventChan <- event.GameOutputEvent{
+						Error: fmt.Errorf("Registered player with id %d not found in player instances!", id),
+					}
 				}
+				fallback := CreateNewPlayer(0, id, 0, 0)
+				fallback.State = FAIL
+				playersSlice[i] = PlayerAndIdPair{id, fallback}
+				i++
+				continue
 			}
 			playersSlice[i] = PlayerAndIdPair{id, player}
 			i++
