@@ -1,3 +1,21 @@
+## Run tests
+
+```bash
+go test ./tests/
+```
+
+## Run cli
+
+```bash
+go run . config.json < events
+```
+
+## Run monitor (raylib desktop app)
+
+```bash
+go run ./monitor config.json < events
+```
+
 # System prototype
 The prototype must be able to work with a configuration file and a set of external events of a certain format.
 Solution should contain golang (1.22 or newer) source file/files and unit tests (optional)
