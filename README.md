@@ -31,18 +31,18 @@ A player is participating in a challenge. The goal is to completely clear a dung
 
 
 ## Rules
-1.  Only registered players are allowed to participate in the challenge
-2.  The challenge ends if:
-    1.  The player leaves the dungeon
-    2.  The player cannot continue the challenge
-    3.  The dungeon opening time has expired
-    4.  Player is dead (health drops to 0) 
-3.  When entering the boss's floor, the player receives a notification
-4.  The boss floor does not contain any monsters
+1.  Only registered players are allowed to participate in the challenge ✅
+2.  The challenge ends if: ✅
+    1.  The player leaves the dungeon ✅
+    2.  The player cannot continue the challenge ✅
+    3.  The dungeon opening time has expired ✅
+    4.  Player is dead (health drops to 0) ✅
+3.  When entering the boss's floor, the player receives a notification ✅
+4.  The boss floor does not contain any monsters ✅
 5.  The dungeon is considered complete if:
-    1.  All floors are cleared of monsters
-    2.  The boss is defeated
-6.  A floor is considered complete when all monsters or the boss have been killed; ***any time spent in that floor is no longer counted***
+    1.  All floors are cleared of monsters ✅
+    2.  The boss is defeated ✅
+6.  A floor is considered complete when all monsters or the boss have been killed; ***any time spent in that floor is no longer counted*** ✅
 7.  The player's health cannot exceed 100 ✅
 
 
