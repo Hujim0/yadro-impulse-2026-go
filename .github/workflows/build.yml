@@ -1,0 +1,35 @@
+name: Build Monitor
+on:
+  workflow_run:
+    workflows: ["Go Test CI"]
+    types: [completed]
+
+jobs:
+  build-monitor:
+    name: Build Monitor (${{ matrix.os }})
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.3"
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwayland-dev libxrandr-dev libxcursor-dev libxi-dev libxinerama-dev libxxf86vm-dev libxkbcommon-dev libgl1-mesa-dev
+      - name: Install macOS deps
+        if: runner.os == 'macOS'
+        run: brew install pkg-config
+      - name: Install Windows deps
+        if: runner.os == 'Windows'
+        run: choco install mingw --no-progress -y
+      - name: Build monitor binary
+        run: go build -o monitor-${{ runner.os }}${{ runner.os == 'Windows' && '.exe' || '' }} ./monitor
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitor-${{ runner.os }}
+          path: monitor-${{ runner.os }}${{ runner.os == 'Windows' && '.exe' || '' }}
